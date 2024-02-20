@@ -3,13 +3,13 @@ import re
 import requests
 import string
 import eyed3
+from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
 
 class MusicScraper:
     def __init__(self):
         self.session = requests.Session()
-        pass
-    
+
     def scrape_playlist(self, spotify_playlist_link, music_folder):
         # Pattern used to extract id from the URL
         pattern = r"https://open\.spotify\.com/playlist/([a-zA-Z0-9]+)\?si=.*"
@@ -38,9 +38,14 @@ class MusicScraper:
             page = response.json()['nextOffset']
 
             print("*" * 100)
-            for count, song in enumerate(track_list):
-                print("[*] Downloading: ", song['title'], "-", song['artists'])
-                self.download_song(song, playlist_folder_path, headers)
+
+            with ThreadPoolExecutor() as executor:
+                for count, song in enumerate(track_list):
+                    print("[*] Downloading: ", song['title'], "-", song['artists'])
+                    executor.submit(self.download_song, song, playlist_folder_path, headers)
+
+                # Wait for all threads to finish
+                executor.shutdown()
             if page is not None:
                 offset_data['offset'] = page
             else:
@@ -48,13 +53,13 @@ class MusicScraper:
                 print('[*] Download Complete!')
                 print("*" * 100)
                 break
-    
+
     def get_playlist_name(self, url, headers):
-        meta_data = self.session.get(url=url, headers=headers)
-        playlist_name = meta_data.json()['title'] + ' - ' + meta_data.json()['artists']
-        print('Playlist Name:', playlist_name)
-        return playlist_name
-    
+            meta_data = self.session.get(url=url, headers=headers)
+            playlist_name = meta_data.json()['title'] + ' - ' + meta_data.json()['artists']
+            print('Playlist Name:', playlist_name)
+            return playlist_name
+        
     def create_folder_path(self, playlist_name, music_folder):
         folder_path = ''.join(e for e in playlist_name if e.isalnum() or e in [' ', '_'])
         playlist_folder_path = os.path.join(music_folder, folder_path)
@@ -62,7 +67,7 @@ class MusicScraper:
         if not os.path.exists(playlist_folder_path):
             os.makedirs(playlist_folder_path)
         return playlist_folder_path
-    
+
     def download_song(self, song, playlist_folder_path, headers):
         try:
             song_id = song['id']
@@ -80,7 +85,7 @@ class MusicScraper:
                 print('[*] No Download Link Found. Skipping...')
         except IndentationError as error_status:
             print('[*] Error Status Code:', error_status)
-    
+
     def get_download_link(self, song_id, headers):
         url = f'https://api.spotifydown.com/download/{song_id}'
         response = self.session.get(url=url, headers=headers)
@@ -88,7 +93,7 @@ class MusicScraper:
         image_url = response.json().get('metadata').get('cover')
         
         return response.json().get('link'), image_url
-    
+
     def build_filename(self, song):
         title = song['title'].translate(str.maketrans('', '', string.punctuation))
         artists = song['artists'].translate(str.maketrans('', '', string.punctuation))
@@ -103,7 +108,7 @@ class MusicScraper:
             for data in link.iter_content(block_size):
                 f.write(data)
                 downloaded += len(data)
-    
+
     def attach_img_to_mp3(self, image_url, mp3_file_path):
         # Open the MP3 file
         audiofile = eyed3.load(mp3_file_path)
