@@ -3,6 +3,7 @@ import re
 import requests
 import string
 import eyed3
+from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
 import time
 
@@ -30,29 +31,33 @@ class MusicScraper:
         playlist_folder_path = self.create_folder_path(playlist_name, music_folder)
         
         tracklist_url = f'https://api.spotifydown.com/trackList/playlist/{playlist_id}'
-        offset_data = {'offset': 0}
+        offset_data = {}
+        offset = 0
+        offset_data['offset'] = offset
         
-        response = self.session.get(url=tracklist_url, params=offset_data, headers=headers)
-        track_list = response.json()['trackList']
-        page = response.json()['nextOffset']
+        while offset is not None:
+            response = self.session.get(url=tracklist_url, params=offset_data, headers=headers)
+            track_list = response.json()['trackList']
+            page = response.json()['nextOffset']
 
-        print("*" * 100)
-        for count, song in enumerate(track_list):
-            print("[*] Downloading: ", song['title'], "-", song['artists'])
-            self.download_song(song, playlist_folder_path, headers)
-        if page is not None:
-            offset_data['offset'] = page
-        else:
             print("*" * 100)
-            print('[*] Download Complete!')
-            print("*" * 100)
-    
+            for count, song in enumerate(track_list):
+                print(count, song['title'])
+
+            if page is not None:
+                offset_data['offset'] = page
+                response = self.session.get(url=playlist_url, params=offset_data, headers=headers)
+            else:
+                print("*" * 100)
+                print('[*] Download Complete!')
+                print("*" * 100)
+
     def get_playlist_name(self, url, headers):
         meta_data = self.session.get(url=url, headers=headers)
         playlist_name = meta_data.json()['title'] + ' - ' + meta_data.json()['artists']
         print('Playlist Name:', playlist_name)
         return playlist_name
-    
+        
     def create_folder_path(self, playlist_name, music_folder):
         folder_path = ''.join(e for e in playlist_name if e.isalnum() or e in [' ', '_'])
         playlist_folder_path = os.path.join(music_folder, folder_path)
@@ -60,7 +65,7 @@ class MusicScraper:
         if not os.path.exists(playlist_folder_path):
             os.makedirs(playlist_folder_path)
         return playlist_folder_path
-    
+
     def download_song(self, song, playlist_folder_path, headers, max_retries=10, retry_delay=1):
         song_id = song['id']
 
@@ -97,7 +102,7 @@ class MusicScraper:
         image_url = response.json().get('metadata').get('cover')
         
         return response.json().get('link'), image_url
-    
+
     def build_filename(self, song):
         title = song['title'].translate(str.maketrans('', '', string.punctuation))
         artists = song['artists'].translate(str.maketrans('', '', string.punctuation))
@@ -112,7 +117,7 @@ class MusicScraper:
             for data in link.iter_content(block_size):
                 f.write(data)
                 downloaded += len(data)
-    
+
     def attach_img_to_mp3(self, image_url, mp3_file_path):
         # Open the MP3 file
         audiofile = eyed3.load(mp3_file_path)
