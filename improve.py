@@ -2,10 +2,12 @@ import os
 import re
 import requests
 import string
+import eyed3
+from io import BytesIO
 
 class MusicScraper:
     def __init__(self):
-        # self.session = requests.Session()
+        self.session = requests.Session()
         pass
     
     def scrape_playlist(self, spotify_playlist_link, music_folder):
@@ -31,7 +33,7 @@ class MusicScraper:
         offset_data = {'offset': 0}
         
         while True:
-            response = requests.get(url=tracklist_url, params=offset_data, headers=headers)
+            response = self.session.get(url=tracklist_url, params=offset_data, headers=headers)
             track_list = response.json()['trackList']
             page = response.json()['nextOffset']
 
@@ -49,7 +51,7 @@ class MusicScraper:
                 break
     
     def get_playlist_name(self, url, headers):
-        meta_data = requests.get(url=url, headers=headers)
+        meta_data = self.session.get(url=url, headers=headers)
         playlist_name = meta_data.json()['title'] + ' - ' + meta_data.json()['artists']
         print('Playlist Name:', playlist_name)
         return playlist_name
@@ -65,15 +67,34 @@ class MusicScraper:
     def download_song(self, song, playlist_folder_path, headers):
         try:
             song_id = song['id']
-            download_link = self.get_download_link(song_id, headers)
+            download_link, iamgeLink = self.get_download_link(song_id, headers)
 
             if download_link:
                 filename = self.build_filename(song)
                 filepath = os.path.join(playlist_folder_path, filename)
-
                 self.download_song_file(download_link, filepath)
-
                 song['file'] = filepath
+                
+                print(iamgeLink)
+
+                mp3_file_path = "music/test  Emil Storgaard Andersen/"+filename
+                image_url = iamgeLink
+
+                # Open the MP3 file
+                audiofile = eyed3.load(mp3_file_path)
+                if audiofile is None:
+                    print(f"Failed to load MP3 file: {mp3_file_path}")
+                    return
+                
+                response = requests.get(image_url)
+                # Attach the downloaded image to the MP3 file
+                audiofile.tag.images.set(3, response.content, 'image/jpeg', u"Description")
+
+                # Save the changes
+                audiofile.tag.save()
+
+                print(f"Image attached to {mp3_file_path}")
+                    
             else:
                 print('[*] No Download Link Found. Skipping...')
         except IndentationError as error_status:
@@ -81,8 +102,11 @@ class MusicScraper:
     
     def get_download_link(self, song_id, headers):
         url = f'https://api.spotifydown.com/download/{song_id}'
-        response = requests.get(url=url, headers=headers)
-        return response.json().get('link')
+        response = self.session.get(url=url, headers=headers)
+        
+        imageLink = response.json().get('metadata').get('cover')
+        
+        return response.json().get('link'), imageLink
     
     def build_filename(self, song):
         title = song['title'].translate(str.maketrans('', '', string.punctuation))
@@ -90,7 +114,7 @@ class MusicScraper:
         return f"{title} - {artists}.mp3"
 
     def download_song_file(self, download_link, filepath):
-        link = requests.get(download_link, stream=True)
+        link = self.session.get(download_link, stream=True)
         block_size = 1024  # 1 Kilobyte
         downloaded = 0
 
