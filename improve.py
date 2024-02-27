@@ -9,24 +9,17 @@ import time
 class MusicScraper:
     def __init__(self):
         self.session = requests.Session()
-    
+            
     def scrape_playlist(self, spotify_playlist_link, music_folder):
-        # Pattern used to extract id from the URL
-        pattern = r"https://open\.spotify\.com/playlist/([a-zA-Z0-9]+)\?si=.*"
-        match = re.match(pattern, spotify_playlist_link)
-
-        if not match:
-            raise ValueError("Invalid Spotify playlist URL.")
-
-        playlist_id = match.group(1)
-        
         headers = {
             'origin': 'https://spotifydown.com',
             'referer': 'https://spotifydown.com/',
         }
+                
+        playlist_id = self.get_playlist_id(spotify_playlist_link)
         
-        playlist_url = f'https://api.spotifydown.com/metadata/playlist/{playlist_id}'
-        playlist_name = self.get_playlist_name(playlist_url, headers)
+        playlist_name = self.get_playlist_name(playlist_id, headers)
+        
         playlist_folder_path = self.create_folder_path(playlist_name, music_folder)
         
         tracklist_url = f'https://api.spotifydown.com/trackList/playlist/{playlist_id}'
@@ -47,8 +40,9 @@ class MusicScraper:
             print('[*] Download Complete!')
             print("*" * 100)
     
-    def get_playlist_name(self, url, headers):
-        meta_data = self.session.get(url=url, headers=headers)
+    def get_playlist_name(self, playlist_id, headers):
+        playlist_url = f'https://api.spotifydown.com/metadata/playlist/{playlist_id}'
+        meta_data = self.session.get(url=playlist_url, headers=headers)
         playlist_name = meta_data.json()['title'] + ' - ' + meta_data.json()['artists']
         print('Playlist Name:', playlist_name)
         return playlist_name
@@ -88,7 +82,7 @@ class MusicScraper:
         else:
             print(f"Max retries reached. Could not download {filename}.")
 
-        self.attach_img_to_mp3(iamge_url, filepath)
+        # self.attach_img_to_mp3(iamge_url, filepath)
 
     def get_download_link(self, song_id, headers):
         url = f'https://api.spotifydown.com/download/{song_id}'
@@ -126,6 +120,17 @@ class MusicScraper:
 
         # Save the changes
         audiofile.tag.save()
+
+    def get_playlist_id(self, spotify_playlist_link):
+        # Pattern used to extract id from the URL
+        pattern = r"https://open\.spotify\.com/playlist/([a-zA-Z0-9]+)\?si=.*"
+        match = re.match(pattern, spotify_playlist_link)
+
+        if not match:
+            raise ValueError("Invalid Spotify playlist URL.")
+
+        playlist_id = match.group(1)
+        return playlist_id
 
 if __name__ == "__main__":
     # Spotify playlist link
