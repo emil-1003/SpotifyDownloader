@@ -5,7 +5,7 @@ import string
 import eyed3
 from io import BytesIO
 import time
-import threading
+from concurrent.futures import ThreadPoolExecutor
 
 class MusicScraper():
     def __init__(self):
@@ -35,21 +35,13 @@ class MusicScraper():
                 page = response.json()['nextOffset']
                 
                 print("*"*100)
-                # for count, song in enumerate(track_list):
-                #     print("[*] Downloading : ", song['title'], "-", song['artists'])
-                #     self.download_song(song, playlist_folder_path)
-                    
-                threads = []
-                for song in track_list:
-                    print("[*] Downloading : ", song['title'], "-", song['artists'])
-                    thread = threading.Thread(target=self.download_song, args=(song, playlist_folder_path))
-                    threads.append(thread)
-                    thread.start()
-
+                with ThreadPoolExecutor() as executor:
+                    for count, song in enumerate(track_list):
+                        print("[*] Downloading : ", song['title'], "-", song['artists'])
+                        executor.submit(self.download_song, song, playlist_folder_path)
+                        
                 # Wait for all threads to finish
-                for thread in threads:
-                    thread.join()
-                    
+                executor.shutdown()
             if page is not None:
                 offset_data['offset'] = page
                 # TODO: ved ikke helt hvorfor den er her:
