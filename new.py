@@ -5,6 +5,7 @@ import string
 import eyed3
 from io import BytesIO
 import time
+import threading
 
 class MusicScraper():
     def __init__(self):
@@ -34,9 +35,20 @@ class MusicScraper():
                 page = response.json()['nextOffset']
                 
                 print("*"*100)
-                for count, song in enumerate(track_list):
+                # for count, song in enumerate(track_list):
+                #     print("[*] Downloading : ", song['title'], "-", song['artists'])
+                #     self.download_song(song, playlist_folder_path)
+                    
+                threads = []
+                for song in track_list:
                     print("[*] Downloading : ", song['title'], "-", song['artists'])
-                    self.download_song(song, playlist_folder_path)
+                    thread = threading.Thread(target=self.download_song, args=(song, playlist_folder_path))
+                    threads.append(thread)
+                    thread.start()
+
+                # Wait for all threads to finish
+                for thread in threads:
+                    thread.join()
                     
             if page is not None:
                 offset_data['offset'] = page
@@ -247,7 +259,7 @@ class MusicScraper():
 
 if __name__ == "__main__":
     # Spotify playlist link
-    spotify_playlist_link = "https://open.spotify.com/playlist/4rNQmSA7Rk2tn2q5fGUg3M?si=ea96293f3c864b4d"
+    spotify_playlist_link = "https://open.spotify.com/playlist/6jaDySLGoGfQVIz8J8vR8b?si=a20986c81831462b"
 
     if spotify_playlist_link:
         # Path to music folder
