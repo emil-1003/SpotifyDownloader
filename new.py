@@ -39,7 +39,7 @@ class MusicScraper():
                 print("*"*100)
                 with ThreadPoolExecutor() as executor:
                     for count, song in enumerate(track_list):
-                        # print("[*] Downloading : ", song['title'], "-", song['artists'], realCount)
+                        print("[*] Downloading : ", song['title'], "-", song['artists'], realCount)
                         executor.submit(self.download_song, song, playlist_folder_path, realCount)
                         realCount += 1
                         
@@ -127,23 +127,6 @@ class MusicScraper():
         print('Playlist Name : ', playlist_name)
         return playlist_name
 
-    def errorcatch(self, SONG_ID):
-        # The 'errorcatch' function from your scraper code
-        print('[*] Trying to download...')
-        headers = {
-            'authority': 'api.spotifydown.com',
-            'method': 'GET',
-            'path': f'/download/{SONG_ID}',
-            'scheme': 'https',
-            'origin': 'https://spotifydown.com',
-            'referer': 'https://spotifydown.com/',
-            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36',
-        }
-        x = self.session.get(headers=headers, url='https://api.spotifydown.com/download/' + SONG_ID)
-        if x.status_code == 200:
-            return x.json()['link']
-        return None
-
     def V2catch(self, SONG_ID):
         headers = {
             "Origin": "https://spotifydown.com",
@@ -158,8 +141,6 @@ class MusicScraper():
                 'link' : x.json()['link'],
                 'metadata' : None
             }
-        else:
-            print("fejl")
 
         return None
 
@@ -187,7 +168,7 @@ class MusicScraper():
         return playlist_folder_path
 
     def download_song(self, song, playlist_folder_path, realcount):
-        filename = str(realcount)+ ' - ' +song['title'].translate(str.maketrans('', '', string.punctuation)) + ' - ' + song['artists'].translate(str.maketrans('', '', string.punctuation)) + '.mp3'
+        filename = song['title'].translate(str.maketrans('', '', string.punctuation)) + ' - ' + song['artists'].translate(str.maketrans('', '', string.punctuation)) + '.mp3'
         filepath = os.path.join(playlist_folder_path, filename)
         cover = song['cover']
         try:
