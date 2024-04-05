@@ -3,7 +3,7 @@ import re
 
 if __name__ == "__main__":
     # Spotify playlist link
-    spotify_playlist_link = "https://open.spotify.com/playlist/6jaDySLGoGfQVIz8J8vR8b?si=e5800598da8f4b13"
+    spotify_playlist_link = input("Type spotify playlist link: ")
     
     pattern = r"https://open\.spotify\.com/playlist/([a-zA-Z0-9]+)\?si=.*"
     match = re.match(pattern, spotify_playlist_link)

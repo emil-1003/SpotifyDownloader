@@ -28,6 +28,8 @@ class MusicScraper():
         offset = 0
         offset_data['offset'] = offset
 
+        realCount = 1
+
         while offset is not None:
             response = self.session.get(url=tracklist_url, params=offset_data, headers=headers)
             if response.status_code == 200:
@@ -37,8 +39,9 @@ class MusicScraper():
                 print("*"*100)
                 with ThreadPoolExecutor() as executor:
                     for count, song in enumerate(track_list):
-                        print("[*] Downloading : ", song['title'], "-", song['artists'])
-                        executor.submit(self.download_song, song, playlist_folder_path)
+                        # print("[*] Downloading : ", song['title'], "-", song['artists'], realCount)
+                        executor.submit(self.download_song, song, playlist_folder_path, realCount)
+                        realCount += 1
                         
                 # Wait for all threads to finish
                 executor.shutdown()
@@ -143,37 +146,20 @@ class MusicScraper():
 
     def V2catch(self, SONG_ID):
         headers = {
-            "authority": "api.spotifydown.com",
-            "method": "POST",
-            "path": '/download/68GdZAAowWDac3SkdNWOwo',
-            "scheme": "https",
-            "Accept": "*/*",
-
-            'Sec-Ch-Ua':'"Chromium";v="118", "Google Chrome";v="118", "Not=A?Brand";v="99"',
-            "Dnt": '1',
             "Origin": "https://spotifydown.com",
-            "Referer": "https://spotifydown.com/",
-            "Sec-Ch-Ua-Mobile": "?0",
-            "Sec-Fetch-Dest": "empty",
-            "Sec-Fetch-Mode": "cors",
-            "Sec-Fetch-Site": "cross-site",
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36'
+            "Referer": "https://spotifydown.com/"
         }
 
         x = self.session.get(url = f'https://api.spotifydown.com/download/{SONG_ID}', headers=headers)
 
         if x.status_code == 200:
 
-            try:
-                return {
-                    'link' : x.json()['link'],
-                    'metadata' : None
-                }
-            except:
-                return {
-                    'link' : None,
-                    'metadata' : None
-                }
+            return {
+                'link' : x.json()['link'],
+                'metadata' : None
+            }
+        else:
+            print("fejl")
 
         return None
 
@@ -200,37 +186,18 @@ class MusicScraper():
         
         return playlist_folder_path
 
-    def download_song(self, song, playlist_folder_path):
-        filename = song['title'].translate(str.maketrans('', '', string.punctuation)) + ' - ' + song['artists'].translate(str.maketrans('', '', string.punctuation)) + '.mp3'
+    def download_song(self, song, playlist_folder_path, realcount):
+        filename = str(realcount)+ ' - ' +song['title'].translate(str.maketrans('', '', string.punctuation)) + ' - ' + song['artists'].translate(str.maketrans('', '', string.punctuation)) + '.mp3'
         filepath = os.path.join(playlist_folder_path, filename)
+        cover = song['cover']
         try:
             ########### Måske gør dette så alle sange bliver downloaded ###########
-            try:
-                V2METHOD    = self.V2catch(song['id'])
-                download_link     = V2METHOD['link']
-                SONG_META   = song
-                SONG_META['file'] = filepath
-
-            except IndentationError:
-                print("okay")
-                yt_id = self.get_ID(song['id'])
-
-                if yt_id is not None:
-                    data = self.generate_Analyze_id(yt_id['id'])
-                    try:
-                        DL_ID = data['links']['mp3']['mp3128']['k']
-                        DL_DATA = self.generate_Conversion_id(data['vid'], DL_ID)
-                        download_link = DL_DATA['dlink']
-                    except Exception as NoLinkError:
-                        CatchMe = self.errorcatch(song['id'])
-                        if CatchMe is not None:
-                            download_link = CatchMe
-                else:
-                    print('[*] No data found for : ', song)
-            ######################################################################
+            V2METHOD    = self.V2catch(song['id'])
+            download_link     = V2METHOD['link']
 
             if download_link is not None:
                 self.download_song_file(download_link, filepath)
+                self.attach_image_to_mp3(filepath, cover)
 
             else:
                 print('[*] No Download Link Found. Skipping...')
@@ -249,9 +216,28 @@ class MusicScraper():
                 f.write(data)
                 downloaded += len(data)
 
+    def attach_image_to_mp3(self, mp3_file_path, image_url):
+        # Download the image from the URL
+        response = requests.get(image_url)
+        if response.status_code != 200:
+            print(f"Failed to download image from {image_url}")
+            return
+
+        # Open the MP3 file
+        audiofile = eyed3.load(mp3_file_path)
+        if audiofile is None:
+            print(f"Failed to load MP3 file: {mp3_file_path}")
+            return
+
+        # Attach the downloaded image to the MP3 file
+        audiofile.tag.images.set(3, response.content, 'image/jpeg', u"Description")
+
+        # Save the changes
+        audiofile.tag.save()
+
 if __name__ == "__main__":
     # Spotify playlist link
-    spotify_playlist_link = "https://open.spotify.com/playlist/6jaDySLGoGfQVIz8J8vR8b?si=a20986c81831462b"
+    spotify_playlist_link = input("Type spotify playlist link: ")
 
     if spotify_playlist_link:
         # Path to music folder
